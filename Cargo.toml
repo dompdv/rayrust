@@ -8,3 +8,4 @@ edition = "2018"
 
 [dependencies]
 timeit = "0.1.2"
+minifb = "0.16"

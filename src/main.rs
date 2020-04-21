@@ -1,5 +1,8 @@
-#[macro_use]
-extern crate timeit;
+//#[macro_use]
+//extern crate timeit;
+
+use minifb::{Key, Window, WindowOptions};
+
 
 #[derive(Debug)]
 enum QuadraticRoots {
@@ -37,9 +40,10 @@ impl Vector {
         self.scale(1.0 / n)
     }
 
-    fn negate(&self)-> Vector {
+    /* fn negate(&self)-> Vector {
         Vector::new(-self.x, -self.y, -self.z)
     }
+    */
 
     fn add(&self, v: &Vector) -> Vector {
         Vector::new(self.x + v.x, self.y + v.y, self.z + v.z) 
@@ -157,8 +161,13 @@ fn ray_inter_sphere(ray: &Ray, center: &Vector, radius: f64) -> QuadraticRoots {
 
 
 fn main() {
-    let screen_width = 16;
-    let screen_height = 16;
+    let screen_width = 100;
+    let screen_height = 100;
+    let width: usize = screen_width as usize;
+    let height: usize = screen_height as usize;
+
+    let mut buffer: Vec<u32> = vec![0; width * height];
+
     let eye = Vector::new(0.0, 0.0, 1.0);
     let direction = Vector::new(0.0, 1.0, 0.0);
     let camera = Camera::new(
@@ -178,8 +187,37 @@ fn main() {
             let point = camera.pixel(x, y);
             let ray = Ray::new(&eye, &point.minus(&eye));
             let intersections = ray_inter_sphere(&ray, &center, radius);
-            println!("{}:{} -> {:?} {:?}", x,y, ray, intersections);
+            // println!("{}:{} -> {:?} {:?}", x,y, ray, intersections);
+            let pixel: u32 = 
+                match intersections {
+                    QuadraticRoots::None => 0, 
+                    QuadraticRoots::Double(_) => 0x00FFFFFF,
+                    QuadraticRoots::Couple(_, _) => 0x00FFFFFF,
+                };
+            buffer[(y as usize) * width + (x as usize)] = pixel;
         }
     }
-    println!("{:?}", camera);
+
+
+    let mut window = Window::new(
+        "Ray - ESC to exit",
+        width,
+        height,
+        WindowOptions::default(),
+    )
+    .unwrap_or_else(|e| {
+        panic!("{}", e);
+    });
+
+    // Limit to max ~60 fps update rate
+    window.limit_update_rate(Some(std::time::Duration::from_micros(16600)));
+
+    while window.is_open() && !window.is_key_down(Key::Escape) {
+
+        // We unwrap here as we want this code to exit if it fails. Real applications may want to handle this in a different way
+        window
+            .update_with_buffer(&buffer, width, height)
+            .unwrap();
+    }
+    
 }

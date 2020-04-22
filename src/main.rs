@@ -1,14 +1,32 @@
-//#[macro_use]
-//extern crate timeit;
+#[macro_use]
+extern crate timeit;
 
 use minifb::{Key, Window, WindowOptions};
-
 
 #[derive(Debug)]
 enum QuadraticRoots {
     None,
     Double(f64),
     Couple(f64, f64)
+}
+
+impl QuadraticRoots {
+    fn _trim(&self, threshold: f64) -> QuadraticRoots {
+        match self {
+            QuadraticRoots::None => QuadraticRoots::None,
+            QuadraticRoots::Double(x) => if x > &threshold { QuadraticRoots::Double(*x)} else { QuadraticRoots::None},
+            QuadraticRoots::Couple(x1, x2) => 
+                if x1 > &threshold && x2 > &threshold { 
+                        QuadraticRoots::Couple(*x1, *x2) 
+                    } else if x1 > &threshold && x2 <= &threshold {
+                        QuadraticRoots::Double(*x1)
+                    } else if x1 <= &threshold && x2 > &threshold {
+                        QuadraticRoots::Double(*x2)
+                    } else { 
+                        QuadraticRoots::None 
+                    }
+        }
+    }
 }
 
 #[derive(Debug)]
@@ -20,11 +38,7 @@ struct Vector {
 
 impl Vector {
     fn new(x: f64, y:f64, z:f64) -> Self {
-        Vector {
-            x,
-            y,
-            z
-        }
+        Vector {x, y, z}
     }
 
     fn norm2(&self) -> f64 {
@@ -76,6 +90,10 @@ impl Ray {
             origin: o, 
             dir: d
         }
+    }
+
+    fn at_t(&self, t: f64) -> Vector {
+        self.origin.add(&self.dir.scale(t))
     }
 }
 
@@ -143,26 +161,42 @@ impl Camera {
         let half_width = (self.screen_width / 2) as i32;
         let half_height = (self.screen_height / 2) as i32;
         let x = x - half_width;
-        let y = y - half_height;
+        let y = -y + half_height;
         let h = self.hor.scale(x as f64);
         let v = self.vert.scale(y as f64);
         self.center.add(&h.add(&v))
     }
 }
 
+#[derive(Debug)]
+struct Sphere {
+    center: Vector,
+    radius:f64,
+}
 
-fn ray_inter_sphere(ray: &Ray, center: &Vector, radius: f64) -> QuadraticRoots {
-    let a = ray.dir.norm2();
-    let diff_o_c = ray.origin.minus(center);
-    let b = 2.0 * ray.dir.dot(&diff_o_c);
-    let c = - radius * radius + diff_o_c.norm2();
-    solve_quadratic(a, b, c)
+impl Sphere {
+    fn ray_intersections(&self, ray: &Ray, v: &mut Vec<f64>) -> () {
+        let a = ray.dir.norm2();
+        let diff_o_c = ray.origin.minus(&self.center);
+        let b = 2.0 * ray.dir.dot(&diff_o_c);
+        let c = - self.radius * self.radius + diff_o_c.norm2();
+        let intes = solve_quadratic(a, b, c);
+        match intes {
+            QuadraticRoots::None => (),
+            QuadraticRoots::Double(x) => v.push(x),
+            QuadraticRoots::Couple(x1, x2) => { v.push(x1); v.push(x2); }
+        };
+    }
+    
+    fn normal_at_point(&self, point: &Vector) -> Vector {
+        point.minus(&self.center).normalized()
+    }
 }
 
 
 fn main() {
-    let screen_width = 100;
-    let screen_height = 100;
+    let screen_width = 300;
+    let screen_height = 300;
     let width: usize = screen_width as usize;
     let height: usize = screen_height as usize;
 
@@ -178,26 +212,41 @@ fn main() {
         screen_width,
         screen_height
     );
-
-    let center = Vector::new(0.0, 2.0, 1.0);
-    let radius = 1.0;
-
+    let sphere = Sphere {
+        center: Vector::new(0.0, 2.0, 1.0),
+        radius: 1.0
+    };
+    let light = Vector::new(0.1, -0.1, 1.0).normalized();
+    timeit_loops!( 1, {
     for x in 0..screen_width {
         for y in 0..screen_height {
+            let mut intersections: Vec<f64> = Vec::with_capacity(5);
             let point = camera.pixel(x, y);
             let ray = Ray::new(&eye, &point.minus(&eye));
-            let intersections = ray_inter_sphere(&ray, &center, radius);
+            sphere.ray_intersections(&ray, &mut intersections);
             // println!("{}:{} -> {:?} {:?}", x,y, ray, intersections);
-            let pixel: u32 = 
-                match intersections {
-                    QuadraticRoots::None => 0, 
-                    QuadraticRoots::Double(_) => 0x00FFFFFF,
-                    QuadraticRoots::Couple(_, _) => 0x00FFFFFF,
-                };
+            let mut pixel:u32 = 0;
+            intersections.retain(|&x|x > 0.0);   // Keep only what's in front of the eye (>1.0 ? after the screen ?)
+            if intersections.len() > 0 {
+                let mut t: f64 = std::f64::MAX;
+                for tc in intersections.iter() {
+                    if tc < &t {
+                        t = *tc;
+                    }
+                }
+                let n = sphere.normal_at_point(&ray.at_t(t));
+                let cos_theta = n.dot(&light);
+                let c = 0.15 + 0.8 * if cos_theta > 0.0 { cos_theta} else { 0.0 };
+//                println!("{:?} {:?} {}", n, light, c);
+                let c = if c > 1.0 {1.0 } else { c };
+                let c = if c <0.0 { 0.0 } else { c };
+                let c: u32 = (c * 255.0) as u32;
+                pixel = c + 0x100 * c + 0x10000 * c;
+            }
             buffer[(y as usize) * width + (x as usize)] = pixel;
         }
     }
-
+    } );
 
     let mut window = Window::new(
         "Ray - ESC to exit",

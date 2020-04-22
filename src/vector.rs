@@ -1,5 +1,5 @@
 
-pub mod Vector {
+pub mod vector {
 
     #[derive(Debug)]
     pub struct Vector {

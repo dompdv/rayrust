@@ -4,14 +4,14 @@ extern crate timeit;
 use minifb::{Key, Window, WindowOptions};
 
 mod vector;
-use vector::Vector::Vector;
+use vector::vector::Vector;
 mod scene;
-use scene::Ray;
+use scene::{Ray, Camera, Sphere};
 
 
 fn main() {
-    let screen_width = 300;
-    let screen_height = 300;
+    let screen_width = 500;
+    let screen_height = 500;
     let width: usize = screen_width as usize;
     let height: usize = screen_height as usize;
 
@@ -27,11 +27,8 @@ fn main() {
         screen_width,
         screen_height
     );
-    let sphere = Sphere {
-        center: Vector::new(0.0, 2.0, 1.0),
-        radius: 1.0
-    };
-    let light = Vector::new(0.1, -0.1, 1.0).normalized();
+    let sphere = Sphere::new(&Vector::new(0.0, 2.0, 1.0), 1.0);
+    let light = Vector::new(1.0, -0.1, 1.0).normalized();
     timeit_loops!( 1, {
     for x in 0..screen_width {
         for y in 0..screen_height {

@@ -1,17 +1,16 @@
-mod quadratics;
-use quadratics::{quadratic_roots::QuadraticRoots};
+
 
 mod vector;
-use vector::{Vector};
+use vector::Vector;
 
 #[derive(Debug)]
-struct Ray {
+pub struct Ray {
     origin: Vector,
     dir : Vector,
 }
 
 impl Ray {
-    fn new(origin: &Vector, dir: &Vector) -> Ray {
+    pub fn new(origin: &Vector, dir: &Vector) -> Ray {
         let o = Vector::new(origin.x, origin.y, origin.z);
         let d = Vector::new(dir.x, dir.y, dir.z);
         Ray {

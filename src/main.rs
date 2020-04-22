@@ -4,10 +4,9 @@ extern crate timeit;
 use minifb::{Key, Window, WindowOptions};
 
 mod vector;
-use vector::{Vector};
-
-mod scene_objects;
-use scene_objects::{Ray, Camera, Sphere};
+use vector::Vector::Vector;
+mod scene;
+use scene::Ray;
 
 
 fn main() {

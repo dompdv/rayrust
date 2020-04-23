@@ -47,7 +47,6 @@ impl Ray {
     pub fn new(origin: &Vector, dir: &Vector) -> Ray {
         let o = Vector::new(origin.x, origin.y, origin.z);
         let d = Vector::new(dir.x, dir.y, dir.z);
-        let normalized = d.normalized();
         Ray {
             origin: o, 
             dir: d
@@ -151,6 +150,8 @@ impl RayIntersect for Sphere {
         };
     }
     fn normal_at_point(&self, point: &Vector) -> Vector {
+//        let n = point.minus(&self.center).normalized();
+//        n.add(&Vector::new((20.0 * point.x).cos(), (25.0 * point.y).sin(), 0.0)).normalized()
         point.minus(&self.center).normalized()
     }
     fn who_am_i(&self) -> u32 {
@@ -176,7 +177,8 @@ impl RayIntersect for Floor {
         }
     }
     fn normal_at_point(&self, point: &Vector) -> Vector {
-        Vector::new(0.0, 0.0, 1.0)
+        //Vector::new(0.0, 0.0, 1.0);
+        Vector::new((20.0 * point.x).cos(), (25.0 * point.y).sin(), 1.0).normalized()
     }
     fn who_am_i(&self) -> u32 {
         2

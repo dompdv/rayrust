@@ -6,12 +6,12 @@ use minifb::{Key, Window, WindowOptions};
 mod vector;
 use vector::vector::Vector;
 mod scene;
-use scene::{Ray, Camera, Sphere};
+use scene::{Ray, Camera, Sphere, RayIntersect, Floor};
 
 
 fn main() {
-    let screen_width = 500;
-    let screen_height = 500;
+    let screen_width = 300;
+    let screen_height = 300;
     let width: usize = screen_width as usize;
     let height: usize = screen_height as usize;
 
@@ -27,38 +27,79 @@ fn main() {
         screen_width,
         screen_height
     );
-    let sphere = Sphere::new(&Vector::new(0.0, 2.0, 1.0), 1.0);
-    let light = Vector::new(1.0, -0.1, 1.0).normalized();
-    timeit_loops!( 1, {
-    for x in 0..screen_width {
-        for y in 0..screen_height {
-            let mut intersections: Vec<f64> = Vec::with_capacity(5);
-            let point = camera.pixel(x, y);
-            let ray = Ray::new(&eye, &point.minus(&eye));
-            sphere.ray_intersections(&ray, &mut intersections);
-            // println!("{}:{} -> {:?} {:?}", x,y, ray, intersections);
-            let mut pixel:u32 = 0;
-            intersections.retain(|&x|x > 0.0);   // Keep only what's in front of the eye (>1.0 ? after the screen ?)
-            if intersections.len() > 0 {
-                let mut t: f64 = std::f64::MAX;
-                for tc in intersections.iter() {
-                    if tc < &t {
-                        t = *tc;
+
+    let mut world: Vec<Box<dyn RayIntersect>> = Vec::new();
+    world.push(Box::new(Sphere::new(&Vector::new(0.0, 2.5, 1.0), 1.0)));
+    world.push(Box::new(Sphere::new(&Vector::new(0.0, 2.0, 2.0), 0.5)));
+    world.push(Box::new(Floor::new(0.2)));
+    let light = Vector::new(0.2, -0.2, 1.0).normalized();
+
+    fn is_there_shadow(from: &Vector, dir: &Vector, world: &Vec<Box<dyn RayIntersect>> ) -> bool {
+        // print!("from pt {:?} /", from);
+        let ray = Ray::new(&from, &dir);
+        let mut t_s: Vec<f64> = Vec::with_capacity(5);
+        for object in world.iter() {
+            object.ray_intersections(&ray, &mut t_s);
+            // println!("len:{}", t_s.len());
+            if t_s.len() > 0 {
+                for &t in t_s.iter() {
+                    if t > 0.0 {
+                        // print!("(S) {}", object.who_am_i());
+                        // print!(" w={:?}", ray.at_t(t_s[0]));
+                        return true;
                     }
                 }
-                let n = sphere.normal_at_point(&ray.at_t(t));
-                let cos_theta = n.dot(&light);
-                let c = 0.15 + 0.8 * if cos_theta > 0.0 { cos_theta} else { 0.0 };
-//                println!("{:?} {:?} {}", n, light, c);
-                let c = if c > 1.0 {1.0 } else { c };
-                let c = if c <0.0 { 0.0 } else { c };
-                let c: u32 = (c * 255.0) as u32;
-                pixel = c + 0x100 * c + 0x10000 * c;
+            }
+        }
+        //print!("(NS)");
+        false
+    }
+
+    let mut t_s: Vec<f64> = Vec::with_capacity(5);
+
+    for x in 0..screen_width {
+        for y in 0..screen_height {
+            // print!("{}:{} = ", x, y);
+            let mut current_distance = std::f64::MAX;
+            let mut current_object: Option<&Box<dyn RayIntersect>> = Option::None;
+            let point = camera.pixel(x, y);
+            let ray = Ray::new(&eye, &point.minus(&eye));
+            for object in world.iter() {
+                t_s.clear();
+                object.ray_intersections(&ray, &mut t_s);
+                for &t in t_s.iter() {
+                    if t > 0.0 && t < current_distance {
+                        current_distance = t;
+                        current_object = Some(object);
+                    }
+                }
+            }
+            let mut pixel:u32 = 0x050505;
+            match current_object {
+                None => {},
+                Some(object) => {
+                    // print!("Collide:{} / ", object.who_am_i());
+                    let distance = &ray.dist_at_t(current_distance);
+                    let intersection_point = ray.at_t(current_distance);
+                    // print!("inters pt {:?} /", intersection_point);
+                    let n = object.normal_at_point(&intersection_point);
+                    let cos_theta = n.dot(&light);
+                    let c = if is_there_shadow(&ray.at_t(current_distance - 0.1), &light, &world) {
+                        0.1 
+                    } else { 
+                        4.0 * (0.15 + 0.8 * if cos_theta > 0.0 { cos_theta } else { 0.0 }) / (1.0 + distance)
+                    };
+                    println!();
+                    // println!("{:?} {:?} {}", n, light, c);
+                    let c = if c > 1.0 {1.0 } else { c };
+                    let c = if c < 0.0 { 0.0 } else { c };
+                    let c: u32 = (c * 255.0) as u32;
+                    pixel = c + 0x100 * c + 0x10000 * c;
+                }
             }
             buffer[(y as usize) * width + (x as usize)] = pixel;
         }
     }
-    } );
 
     let mut window = Window::new(
         "Ray - ESC to exit",

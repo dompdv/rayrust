@@ -2,7 +2,7 @@
 
 use crate::vector::vector::Vector;
 
-pub mod Quadratics {
+pub mod quadratics {
 
     #[derive(Debug)]
     pub enum QuadraticRoots {
@@ -35,18 +35,19 @@ pub mod Quadratics {
     
 }
     
-use Quadratics::QuadraticRoots;
+use quadratics::QuadraticRoots;
 
 #[derive(Debug)]
 pub struct Ray {
     origin: Vector,
-    dir : Vector,
+    dir : Vector
 }
 
 impl Ray {
     pub fn new(origin: &Vector, dir: &Vector) -> Ray {
         let o = Vector::new(origin.x, origin.y, origin.z);
         let d = Vector::new(dir.x, dir.y, dir.z);
+        let normalized = d.normalized();
         Ray {
             origin: o, 
             dir: d
@@ -55,6 +56,10 @@ impl Ray {
 
     pub fn at_t(&self, t: f64) -> Vector {
         self.origin.add(&self.dir.scale(t))
+    }
+
+    pub fn dist_at_t(&self, t: f64) -> f64 {
+        self.dir.scale(t).norm()
     }
 }
 
@@ -110,6 +115,12 @@ impl Camera {
     }
 }
 
+pub trait RayIntersect {
+    fn ray_intersections(&self, ray: &Ray, v: &mut Vec<f64>) -> ();
+    fn normal_at_point(&self, point: &Vector) -> Vector;
+    fn who_am_i(&self) -> u32;
+}
+
 #[derive(Debug)]
 pub struct Sphere {
     center: Vector,
@@ -123,7 +134,11 @@ impl Sphere {
             radius
         }
     }
-    pub fn ray_intersections(&self, ray: &Ray, v: &mut Vec<f64>) -> () {
+}
+
+
+impl RayIntersect for Sphere {
+    fn ray_intersections(&self, ray: &Ray, v: &mut Vec<f64>) -> () {
         let a = ray.dir.norm2();
         let diff_o_c = ray.origin.minus(&self.center);
         let b = 2.0 * ray.dir.dot(&diff_o_c);
@@ -135,8 +150,35 @@ impl Sphere {
             QuadraticRoots::Couple(x1, x2) => { v.push(x1); v.push(x2); }
         };
     }
-    
-    pub fn normal_at_point(&self, point: &Vector) -> Vector {
+    fn normal_at_point(&self, point: &Vector) -> Vector {
         point.minus(&self.center).normalized()
+    }
+    fn who_am_i(&self) -> u32 {
+        1
+    }
+}
+
+#[derive(Debug)]
+pub struct Floor {
+    z: f64
+}
+
+impl Floor {
+    pub fn new(z: f64) -> Floor {
+        Floor { z }
+    }
+}
+
+impl RayIntersect for Floor {
+    fn ray_intersections(&self, ray: &Ray, v: &mut Vec<f64>) -> () {
+        if ray.dir.z != 0.0 {
+            v.push((self.z - ray.origin.z) / ray.dir.z);
+        }
+    }
+    fn normal_at_point(&self, point: &Vector) -> Vector {
+        Vector::new(0.0, 0.0, 1.0)
+    }
+    fn who_am_i(&self) -> u32 {
+        2
     }
 }

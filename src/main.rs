@@ -1,34 +1,11 @@
-#[macro_use]
-extern crate timeit;
+//extern crate timeit;
 
 use minifb::{Key, Window, WindowOptions};
 
 mod vector;
 use vector::vector::Vector;
 mod scene;
-use scene::{Ray, Camera, Sphere, RayIntersect, Floor};
-
-fn is_there_shadow(from: &Vector, dir: &Vector, world: &Vec<Box<dyn RayIntersect>> ) -> bool {
-    // print!("from pt {:?} /", from);
-    let ray = Ray::new(&from, &dir);
-    let mut t_s: Vec<f64> = Vec::with_capacity(5);
-    for object in world.iter() {
-        object.ray_intersections(&ray, &mut t_s);
-        // println!("len:{}", t_s.len());
-        if t_s.len() > 0 {
-            for &t in t_s.iter() {
-                if t > 0.0 {
-                    // print!("(S) {}", object.who_am_i());
-                    // print!(" w={:?}", ray.at_t(t_s[0]));
-                    return true;
-                }
-            }
-        }
-    }
-    //print!("(NS)");
-    false
-}
-
+use scene::{Ray, Camera, Sphere, RayIntersect, Floor, Sun, LightSource, SpotLight};
 
 fn main() {
     let screen_width = 600;
@@ -74,7 +51,7 @@ fn main() {
 
 
         let eye = Vector::new(0.0, 0.0, 1.0);
-        let direction = Vector::new(0.0, 1.0, 0.0);
+        let direction = Vector::new(0.0, 1.0, 0.1);
         let camera = Camera::new(
             &eye,
             &direction,
@@ -89,14 +66,14 @@ fn main() {
         world.push(Box::new(Sphere::new(&Vector::new(0.3, 1.5, 1.8), 0.2)));
         world.push(Box::new(Floor::new(0.0)));
 
-        let light = Vector::new(0.2 * time.sin() , 0.3 * time.cos(), 1.0).normalized();
-
+        let sunlight = Sun::new(&Vector::new(1.5 * (time / 10.0).sin() , 1.5 * (time / 10.0).cos(), 1.0), 3.0);
+        let spotlight = SpotLight::new(&Vector::new(1.5 * time.sin() , 1.5 * time.cos(), 5.0 + 1.5 * (2.0*time).cos()), 18.0);
     
         let mut t_s: Vec<f64> = Vec::with_capacity(5);
     
         for x in 0..screen_width {
             for y in 0..screen_height {
-                // print!("{}:{} = ", x, y);
+                //print!("{}:{} = ", x, y);
                 let mut current_distance = std::f64::MAX;
                 let mut current_object: Option<&Box<dyn RayIntersect>> = Option::None;
                 let point = camera.pixel(x, y);
@@ -115,22 +92,21 @@ fn main() {
                 match current_object {
                     None => {},
                     Some(object) => {
-                        // print!("Collide:{} / ", object.who_am_i());
-                        let distance = &ray.dist_at_t(current_distance);
+                        //print!("Collide:{} / ", object.who_am_i());
                         let intersection_point = ray.at_t(current_distance);
                         // print!("inters pt {:?} /", intersection_point);
                         let n = object.normal_at_point(&intersection_point);
-                        let cos_theta = n.dot(&light);
-                        let c = if is_there_shadow(&ray.at_t(current_distance - 0.1), &light, &world) {
-                            0.1 
-                        } else { 
-                            4.0 * (0.15 + 0.8 * if cos_theta > 0.0 { cos_theta } else { 0.0 }) / (1.0 + distance)
-                        };
+                        let mut illumination:f64 = 0.0;
+                        illumination = illumination + sunlight.illumination_at_point(0.19, 1.0, &ray.at_t(current_distance - 0.01), &n, &world);
+                        illumination = illumination + spotlight.illumination_at_point(0.19, 1.0, &ray.at_t(current_distance - 0.01), &n, &world);
+                        // Effet distance
+                        let c = illumination / (1.0 + &ray.dist_at_t(current_distance));
                         //println!();
                         // println!("{:?} {:?} {}", n, light, c);
-                        let c = if c > 1.0 {1.0 } else { c };
+                        // Cap & floor sur [0,1]
+                        let c = if c > 1.0 { 1.0 } else { c };
                         let c = if c < 0.0 { 0.0 } else { c };
-                        let c: u32 = (c * 255.0) as u32;
+                        let c = (c * 255.0) as u32;
                         pixel = c + 0x100 * c + 0x10000 * c;
                     }
                 }

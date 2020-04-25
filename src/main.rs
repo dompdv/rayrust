@@ -5,7 +5,10 @@ use minifb::{Key, Window, WindowOptions};
 mod vector;
 use vector::vector::Vector;
 mod scene;
-use scene::{Ray, Camera, Sphere, WorldObject, Floor, Sun, LightSource, SpotLight};
+use scene::{Ray, Camera, Sphere, WorldObject, Floor};
+
+mod light;
+use light::{Sun, LightSource, SpotLight};
 
 fn main() {
 

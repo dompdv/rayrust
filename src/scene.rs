@@ -114,10 +114,11 @@ impl Camera {
     }
 }
 
-pub trait RayIntersect {
+pub trait WorldObject {
     fn ray_intersections(&self, ray: &Ray, v: &mut Vec<f64>) -> ();
     fn normal_at_point(&self, point: &Vector) -> Vector;
     fn who_am_i(&self) -> u32;
+    fn color_at_point(&self, _point: &Vector) -> f64 { 1.0 }
 }
 
 #[derive(Debug)]
@@ -136,7 +137,7 @@ impl Sphere {
 }
 
 
-impl RayIntersect for Sphere {
+impl WorldObject for Sphere {
     fn ray_intersections(&self, ray: &Ray, v: &mut Vec<f64>) -> () {
         let a = ray.dir.norm2();
         let diff_o_c = ray.origin.minus(&self.center);
@@ -170,7 +171,7 @@ impl Floor {
     }
 }
 
-impl RayIntersect for Floor {
+impl WorldObject for Floor {
     fn ray_intersections(&self, ray: &Ray, v: &mut Vec<f64>) -> () {
         if ray.dir.z != 0.0 {
             v.push((self.z - ray.origin.z) / ray.dir.z);
@@ -180,13 +181,17 @@ impl RayIntersect for Floor {
         Vector::new(0.0, 0.0, 1.0)
         //Vector::new((20.0 * point.x).cos(), (25.0 * point.y).sin(), 1.0).normalized()
     }
+    fn color_at_point(&self, point: &Vector) -> f64 { 
+        0.2 + (point.x.fract() + point.y.fract()).abs()
+    }
+    
     fn who_am_i(&self) -> u32 {
         2
     }
 }
 
 
-fn there_is_shadow(from: &Vector, dir: &Vector, world: &Vec<Box<dyn RayIntersect>>, upper_bound:f64 ) -> bool {
+fn there_is_shadow(from: &Vector, dir: &Vector, world: &Vec<Box<dyn WorldObject>>, upper_bound:f64 ) -> bool {
     //print!("from pt {:?} /", from);
     let ray = Ray::new(&from, &dir);
     let mut t_s: Vec<f64> = Vec::with_capacity(5);
@@ -209,7 +214,7 @@ fn there_is_shadow(from: &Vector, dir: &Vector, world: &Vec<Box<dyn RayIntersect
 
 
 pub trait LightSource {
-    fn illumination_at_point(&self, ambient: f64, color: f64, point:&Vector, normal:&Vector, world: &Vec<Box<dyn RayIntersect>>) -> f64;    
+    fn illumination_at_point(&self, ambient: f64, color: f64, point:&Vector, normal:&Vector, world: &Vec<Box<dyn WorldObject>>) -> f64;    
 }
 
 pub struct Sun {
@@ -226,7 +231,7 @@ impl Sun {
 
 
 impl LightSource for Sun {
-    fn illumination_at_point(&self, ambient: f64, color: f64, point:&Vector, normal:&Vector, world: &Vec<Box<dyn RayIntersect>>) -> f64 {
+    fn illumination_at_point(&self, ambient: f64, color: f64, point:&Vector, normal:&Vector, world: &Vec<Box<dyn WorldObject>>) -> f64 {
         let cos_theta = normal.dot(&self.dir);
         let shadow = there_is_shadow(&point, &self.dir, &world, std::f64::MAX);
         let c = color * (if shadow || cos_theta < 0.0 { ambient } else { self.intensity });
@@ -246,7 +251,7 @@ impl SpotLight {
 }
 
 impl LightSource for SpotLight {
-    fn illumination_at_point(&self, ambient: f64, color: f64, point:&Vector, normal:&Vector, world: &Vec<Box<dyn RayIntersect>>) -> f64 {
+    fn illumination_at_point(&self, ambient: f64, color: f64, point:&Vector, normal:&Vector, world: &Vec<Box<dyn WorldObject>>) -> f64 {
         let direction = self.position.minus(point);
         let cos_theta = normal.dot(&direction.normalized()); 
         let shadow = there_is_shadow(&point, &direction, &world, 1.0);

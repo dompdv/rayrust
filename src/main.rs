@@ -5,9 +5,15 @@ use minifb::{Key, Window, WindowOptions};
 mod vector;
 use vector::vector::Vector;
 mod scene;
-use scene::{Ray, Camera, Sphere, RayIntersect, Floor, Sun, LightSource, SpotLight};
+use scene::{Ray, Camera, Sphere, WorldObject, Floor, Sun, LightSource, SpotLight};
 
 fn main() {
+
+    fn clamp(c:f64) -> f64 {
+        if c > 1.0 { return 1.0 };
+        if c < 0.0 { return 0.0 };
+        c
+    }
     let screen_width = 600;
     let screen_height = 600;
     let width: usize = screen_width as usize;
@@ -61,7 +67,7 @@ fn main() {
             screen_height
         );
     
-        let mut world: Vec<Box<dyn RayIntersect>> = Vec::new();
+        let mut world: Vec<Box<dyn WorldObject>> = Vec::new();
         world.push(Box::new(Sphere::new(&Vector::new(0.0, 2.5, 1.0), 1.0)));
         world.push(Box::new(Sphere::new(&Vector::new(0.3, 1.5, 1.8), 0.2)));
         world.push(Box::new(Floor::new(0.0)));
@@ -75,7 +81,7 @@ fn main() {
             for y in 0..screen_height {
                 //print!("{}:{} = ", x, y);
                 let mut current_distance = std::f64::MAX;
-                let mut current_object: Option<&Box<dyn RayIntersect>> = Option::None;
+                let mut current_object: Option<&Box<dyn WorldObject>> = Option::None;
                 let point = camera.pixel(x, y);
                 let ray = Ray::new(&eye, &point.minus(&eye));
                 for object in world.iter() {
@@ -97,16 +103,16 @@ fn main() {
                         // print!("inters pt {:?} /", intersection_point);
                         let n = object.normal_at_point(&intersection_point);
                         let mut illumination:f64 = 0.0;
-                        illumination = illumination + sunlight.illumination_at_point(0.19, 1.0, &ray.at_t(current_distance - 0.01), &n, &world);
-                        illumination = illumination + spotlight.illumination_at_point(0.19, 1.0, &ray.at_t(current_distance - 0.01), &n, &world);
+                        let color_at_point = object.color_at_point(&intersection_point);
+                        illumination = illumination + sunlight.illumination_at_point(0.19, color_at_point, &ray.at_t(current_distance - 0.01), &n, &world);
+                        illumination = illumination + spotlight.illumination_at_point(0.19, color_at_point, &ray.at_t(current_distance - 0.01), &n, &world);
                         // Effet distance
                         let c = illumination / (1.0 + &ray.dist_at_t(current_distance));
                         //println!();
                         // println!("{:?} {:?} {}", n, light, c);
                         // Cap & floor sur [0,1]
-                        let c = if c > 1.0 { 1.0 } else { c };
-                        let c = if c < 0.0 { 0.0 } else { c };
-                        let c = (c * 255.0) as u32;
+                        
+                        let c = (clamp(c) * 255.0) as u32;
                         pixel = c + 0x100 * c + 0x10000 * c;
                     }
                 }

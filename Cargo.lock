@@ -390,6 +390,7 @@ name = "raytrace"
 version = "0.1.0"
 dependencies = [
  "minifb",
+ "rand 0.7.3",
  "timeit",
 ]
 

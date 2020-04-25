@@ -9,6 +9,8 @@ use scene::{Ray, Camera, Sphere, WorldObject, Floor};
 
 mod light;
 use light::{Sun, LightSource, SpotLight};
+mod noise;
+
 
 fn main() {
 

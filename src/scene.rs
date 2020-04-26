@@ -1,6 +1,7 @@
 
 
 use crate::vector::vector::Vector;
+use crate::noise::{marble};
 
 pub mod quadratics {
 
@@ -114,24 +115,47 @@ impl Camera {
     }
 }
 
+#[derive(Debug)]
+pub enum Texture {
+    Marble (f64, f64, f64, f64, f64), // texture depth, freqx, freqy, frez, turbulence
+    Checker(f64, f64), // Color 1 Color2
+    Uniform(f64) // Color
+}
+pub trait ApplyTexture {
+    fn apply(&self, point: &Vector, noise:&Vec<f64>) -> f64 ;
+}
+
+impl ApplyTexture for Texture {
+    fn apply(&self, point: &Vector, noise:&Vec<f64>) -> f64 {
+        match self {
+            Texture::Uniform(color) => { *color },
+            Texture::Checker(min, amp) => { *min + *amp * (point.x.fract() + point.y.fract()).abs()},
+            Texture::Marble(size, xp, yp, zp, turb) => { marble(noise, point.x, point.y, point.z, *size, *xp, *yp, *zp, *turb) },
+        }
+    }
+}
+
 pub trait WorldObject {
     fn ray_intersections(&self, ray: &Ray, v: &mut Vec<f64>) -> ();
     fn normal_at_point(&self, point: &Vector) -> Vector;
     fn who_am_i(&self) -> u32;
-    fn color_at_point(&self, _point: &Vector) -> f64 { 1.0 }
+    fn color_at_point(&self, point: &Vector, noise:&Vec<f64>) -> f64;
 }
+
 
 #[derive(Debug)]
 pub struct Sphere {
     center: Vector,
     radius:f64,
+    texture:Texture
 }
 
 impl Sphere {
-    pub fn new(center: &Vector, radius: f64) -> Sphere {
+    pub fn new(center: &Vector, radius: f64, texture: Texture) -> Sphere {
         Sphere {
             center: Vector::new(center.x, center.y, center.z),
-            radius
+            radius,
+            texture
         }
     }
 }
@@ -158,16 +182,20 @@ impl WorldObject for Sphere {
     fn who_am_i(&self) -> u32 {
         1
     }
+    fn color_at_point(&self, point: &Vector, noise:&Vec<f64>) -> f64 { 
+        self.texture.apply(&point, &noise) 
+    }
 }
 
 #[derive(Debug)]
 pub struct Floor {
-    z: f64
+    z: f64,
+    texture:Texture
 }
 
 impl Floor {
-    pub fn new(z: f64) -> Floor {
-        Floor { z }
+    pub fn new(z: f64, texture:Texture) -> Floor {
+        Floor { z , texture}
     }
 }
 
@@ -181,10 +209,9 @@ impl WorldObject for Floor {
         Vector::new(0.0, 0.0, 1.0)
         //Vector::new((20.0 * point.x).cos(), (25.0 * point.y).sin(), 1.0).normalized()
     }
-    fn color_at_point(&self, point: &Vector) -> f64 { 
-        0.2 + (point.x.fract() + point.y.fract()).abs()
+    fn color_at_point(&self, point: &Vector, noise:&Vec<f64>) -> f64 { 
+        self.texture.apply(&point, &noise) 
     }
-    
     fn who_am_i(&self) -> u32 {
         2
     }

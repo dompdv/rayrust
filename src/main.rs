@@ -5,14 +5,17 @@ use minifb::{Key, Window, WindowOptions};
 mod vector;
 use vector::vector::Vector;
 mod scene;
-use scene::{Ray, Camera, Sphere, WorldObject, Floor};
+use scene::{Ray, Camera, Sphere, WorldObject, Floor, Texture};
 
 mod light;
 use light::{Sun, LightSource, SpotLight};
 mod noise;
-
+use noise::{create_noise, smooth_noise, marble};
 
 fn main() {
+
+    let noise = create_noise();
+    println!("{}", smooth_noise(&noise, 0.2, 0.3, 0.2));
 
     fn clamp(c:f64) -> f64 {
         if c > 1.0 { return 1.0 };
@@ -73,11 +76,11 @@ fn main() {
         );
     
         let mut world: Vec<Box<dyn WorldObject>> = Vec::new();
-        world.push(Box::new(Sphere::new(&Vector::new(0.0, 2.5, 1.0), 1.0)));
-        world.push(Box::new(Sphere::new(&Vector::new(0.3, 1.5, 1.8), 0.2)));
-        world.push(Box::new(Floor::new(0.0)));
+        world.push(Box::new(Sphere::new(&Vector::new(0.0, 2.5, 1.0), 1.0, Texture::Marble(16.0, 8.0, 9.0, 1.0, 5.0))));
+        world.push(Box::new(Sphere::new(&Vector::new(0.3, 1.5, 1.8), 0.2, Texture::Marble(16.0, 10.0, 20.0, -8.0, 3.0) )));
+        world.push(Box::new(Floor::new(0.0, Texture::Checker(0.2, 1.0))));
 
-        let sunlight = Sun::new(&Vector::new(1.5 * (time / 10.0).sin() , 1.5 * (time / 10.0).cos(), 1.0), 3.0);
+        let sunlight = Sun::new(&Vector::new(1.5 * (4.0 + time / 10.0).cos() , 1.5 * (4.0 + time / 10.0).sin(), 1.0), 3.0);
         let spotlight = SpotLight::new(&Vector::new(1.5 * time.sin() , 1.5 * time.cos(), 5.0 + 1.5 * (2.0*time).cos()), 18.0);
     
         let mut t_s: Vec<f64> = Vec::with_capacity(5);
@@ -103,20 +106,17 @@ fn main() {
                 match current_object {
                     None => {},
                     Some(object) => {
-                        //print!("Collide:{} / ", object.who_am_i());
                         let intersection_point = ray.at_t(current_distance);
-                        // print!("inters pt {:?} /", intersection_point);
                         let n = object.normal_at_point(&intersection_point);
+
                         let mut illumination:f64 = 0.0;
-                        let color_at_point = object.color_at_point(&intersection_point);
-                        illumination = illumination + sunlight.illumination_at_point(0.19, color_at_point, &ray.at_t(current_distance - 0.01), &n, &world);
-                        illumination = illumination + spotlight.illumination_at_point(0.19, color_at_point, &ray.at_t(current_distance - 0.01), &n, &world);
+                        let color_at_point = object.color_at_point(&intersection_point, &noise);
+                        illumination += sunlight.illumination_at_point(0.19, color_at_point, &ray.at_t(current_distance - 0.01), &n, &world);
+                        illumination += spotlight.illumination_at_point(0.19, color_at_point, &ray.at_t(current_distance - 0.01), &n, &world);
+
                         // Effet distance
                         let c = illumination / (1.0 + &ray.dist_at_t(current_distance));
-                        //println!();
-                        // println!("{:?} {:?} {}", n, light, c);
-                        // Cap & floor sur [0,1]
-                        
+
                         let c = (clamp(c) * 255.0) as u32;
                         pixel = c + 0x100 * c + 0x10000 * c;
                     }

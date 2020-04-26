@@ -1,5 +1,3 @@
-
-
 use crate::vector::vector::Vector;
 use crate::noise::{marble};
 

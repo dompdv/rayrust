@@ -1,8 +1,8 @@
 extern crate rand;
 use rand::prelude::*;
 
-static GRID_SIZE:usize = 128;
-static GRID_SIZEF:f64 = 128.0;
+static GRID_SIZE:usize = 64;
+static GRID_SIZEF:f64 = 64.0;
 
 pub fn create_noise() -> Vec<f64> {
     let mut rng = rand::thread_rng();
